@@ -76,11 +76,12 @@ public class WebServer extends NanoHTTPD {
                 new Thread(() -> {
                     try {
                         Thread.sleep(500);
-                        if (context instanceof AdbConfigService) {
-                            // Or stop self/server directly if reference is held
-                        }
                         stop();
                         Log.i(TAG, "WebServer stopped via API request");
+                        if (context instanceof AdbConfigService) {
+                            // Web server off: the service no longer needs to stay in the foreground
+                            ((AdbConfigService) context).stopForegroundIfIdle();
+                        }
                     } catch (Exception e) {
                         Log.e(TAG, "Error stopping web server", e);
                     }
