@@ -1,7 +1,6 @@
 package com.tpn.adbautoenable;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.LinearLayout;
@@ -21,13 +20,13 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = NetworkUtils.getDeviceProtectedPrefs(this, PREFS_NAME);
         boolean webServerEnabled = prefs.getBoolean("web_server_enabled", true);
 
-        // Start or stop the foreground service to manage web server state based on user preference
+        // No Android service at all: the web server runs in the app process only
+        // while the app is open, so nothing is ever "active in background".
+        AppController.runStartupChecks(this);
         if (webServerEnabled) {
-            // Plain service (not foreground): allowed because the app is on screen
-            startService(new Intent(this, AdbConfigService.class));
+            AppController.startWebServer(this);
         } else {
-            Intent serviceIntent = new Intent(this, AdbConfigService.class);
-            stopService(serviceIntent);
+            AppController.stopWebServer();
         }
 
         // Create UI
@@ -59,14 +58,14 @@ public class MainActivity extends Activity {
             prefs.edit().putBoolean("web_server_enabled", isChecked).apply();
 
             if (isChecked) {
-                startService(new Intent(this, AdbConfigService.class));
+                AppController.startWebServer(this);
             } else {
-                stopService(new Intent(this, AdbConfigService.class));
+                AppController.stopWebServer();
             }
         });
 
         TextView instructionText = new TextView(this);
-        instructionText.setText("\nOpen this URL in your browser to configure pairing, target ports, and manage the app.\n\nThe web interface runs only while this app is open (and briefly after), so the app never stays active in the background. ADB is still configured automatically on every boot.");
+        instructionText.setText("\nOpen this URL in your browser to configure pairing, target ports, and manage the app.\n\nThe web interface runs only while this app is open, so the app never stays active in the background. ADB is still configured automatically on every boot.");
 
         layout.addView(titleText);
         layout.addView(statusText);
@@ -79,5 +78,15 @@ public class MainActivity extends Activity {
 
     private String getLocalIpAddress() {
         return NetworkUtils.getLiveDeviceIP(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // App closed (Back / removed from Recents): stop the web server.
+        // Leaving the app temporarily (e.g. to pair in Settings) keeps it running.
+        if (isFinishing()) {
+            AppController.stopWebServer();
+        }
     }
 }

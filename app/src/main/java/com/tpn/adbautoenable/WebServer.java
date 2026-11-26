@@ -76,11 +76,7 @@ public class WebServer extends NanoHTTPD {
                 new Thread(() -> {
                     try {
                         Thread.sleep(500);
-                        if (context instanceof AdbConfigService) {
-                            ((AdbConfigService) context).stopWebServerAndSelf();
-                        } else {
-                            stop();
-                        }
+                        AppController.stopWebServer();
                         Log.i(TAG, "WebServer stopped via API request");
                     } catch (Exception e) {
                         Log.e(TAG, "Error stopping web server", e);

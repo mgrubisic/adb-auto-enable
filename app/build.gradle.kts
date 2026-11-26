@@ -55,6 +55,7 @@ android {
 
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
+        manifestPlaceholders["appLabel"] = "ADB Auto-Enable"
     }
 
     signingConfigs {
@@ -69,6 +70,8 @@ android {
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
+            // Distinct name so this build is easy to tell apart from the original app
+            manifestPlaceholders["appLabel"] = "ADB Auto-Enable NoBG"
             // Not debuggable: Android shows the 16 KB page-size compatibility dialog
             // only for debuggable apps (libspake2.so from libadb-android is 4 KB aligned)
             isDebuggable = false
