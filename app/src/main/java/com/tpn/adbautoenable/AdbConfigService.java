@@ -147,6 +147,13 @@ public class AdbConfigService extends Service {
             // Fix: Ensure wireless debugging is enabled on EVERY service start, not just boot events.
             enableWirelessDebuggingImmediately();
 
+            // Not a boot event: nothing long-running to do unless the web server is wanted,
+            // so leave the foreground (and "Active in background") straight away.
+            if (!isBootConfigMode && !isWebServerWanted()) {
+                stopForegroundIfIdle();
+                return START_NOT_STICKY;
+            }
+
             // Only run boot configuration if this is a boot event
             if (isBootConfigMode) {
                 if (isConfiguring) {
@@ -172,15 +179,46 @@ public class AdbConfigService extends Service {
                     } finally {
                         isConfiguring = false;
                     }
-                    // Keep web server running
-                    updateNotification("Web server running on port " + WEB_SERVER_PORT);
+                    if (isWebServerWanted()) {
+                        // Keep web server running
+                        updateNotification("Web server running on port " + WEB_SERVER_PORT);
+                    } else {
+                        // Boot configuration done and no web server: stop being a foreground service
+                        stopForegroundIfIdle();
+                    }
                 }).start();
+            }
+            if (!isWebServerWanted()) {
+                // Do not let Android restart a foreground service the user does not need
+                return START_NOT_STICKY;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error in onStartCommand", e);
         }
 
         return START_STICKY;
+    }
+
+    private boolean isWebServerWanted() {
+        return getPrefs().getBoolean("web_server_enabled", true);
+    }
+
+    /**
+     * Leaves the foreground and stops the service when there is nothing left for it to do:
+     * no boot configuration in progress and the web server disabled by the user.
+     * This removes the app from the "Active in background" list and its notification.
+     */
+    void stopForegroundIfIdle() {
+        if (isConfiguring || isWebServerWanted()) {
+            return;
+        }
+        Log.i(TAG, "Nothing left to do (web server disabled), leaving foreground and stopping service");
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE);
+        } catch (Exception e) {
+            Log.e(TAG, "Error leaving foreground", e);
+        }
+        stopSelf();
     }
 
     private void ensureTclAutostartProtectionAsync() {
