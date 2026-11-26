@@ -22,16 +22,11 @@
     <application
         android:directBootAware="true"
         android:allowBackup="false"
-        android:label="ADB Auto-Enable"
+        android:label="${appLabel}"
         android:icon="@android:drawable/ic_dialog_info"
         android:supportsRtl="true"
         tools:ignore="DataExtractionRules">
 
-        <service
-            android:name=".AdbConfigService"
-            android:enabled="true"
-            android:exported="false"
-            android:directBootAware="true" />
 
         <!-- Boot-time ADB configuration runs as a job: no foreground service,
              nothing under "Active in background", no notification -->
