@@ -16,16 +16,12 @@ public class BootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
                 Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)) {
 
-            Log.i(TAG, "Boot event detected, starting ADB configuration service immediately...");
-            startServiceNow(context);
+            Log.i(TAG, "Boot event detected, scheduling ADB configuration job...");
+            // A job instead of a foreground service: nothing appears under
+            // "Active in background" and no notification is shown.
+            BootConfigJobService.schedule(context);
         } else {
             Log.i(TAG, "Ignoring broadcast: " + action);
         }
-    }
-
-    private void startServiceNow(Context context) {
-        Intent serviceIntent = new Intent(context, AdbConfigService.class);
-        serviceIntent.putExtra("boot_config", true);
-        context.startForegroundService(serviceIntent);
     }
 }

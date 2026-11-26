@@ -69,6 +69,9 @@ android {
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
+            // Not debuggable: Android shows the 16 KB page-size compatibility dialog
+            // only for debuggable apps (libspake2.so from libadb-android is 4 KB aligned)
+            isDebuggable = false
         }
         getByName("release") {
             isMinifyEnabled = false

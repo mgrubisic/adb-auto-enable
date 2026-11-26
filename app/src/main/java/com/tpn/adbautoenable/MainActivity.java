@@ -23,9 +23,8 @@ public class MainActivity extends Activity {
 
         // Start or stop the foreground service to manage web server state based on user preference
         if (webServerEnabled) {
-            Intent serviceIntent = new Intent(this, AdbConfigService.class);
-            serviceIntent.putExtra("boot_config", false);
-            startForegroundService(serviceIntent);
+            // Plain service (not foreground): allowed because the app is on screen
+            startService(new Intent(this, AdbConfigService.class));
         } else {
             Intent serviceIntent = new Intent(this, AdbConfigService.class);
             stopService(serviceIntent);
@@ -52,7 +51,7 @@ public class MainActivity extends Activity {
         // Native On-Device Toggle Switch for Web Server
         Switch webServerSwitch = new Switch(this);
         webServerSwitch.setTextSize(16);
-        webServerSwitch.setText("\nEnable Web Interface on Boot");
+        webServerSwitch.setText("\nEnable Web Interface");
         webServerSwitch.setChecked(webServerEnabled);
         webServerSwitch.setPadding(0, 30, 0, 10);
 
@@ -60,16 +59,14 @@ public class MainActivity extends Activity {
             prefs.edit().putBoolean("web_server_enabled", isChecked).apply();
 
             if (isChecked) {
-                Intent serviceIntent = new Intent(this, AdbConfigService.class);
-                serviceIntent.putExtra("boot_config", false);
-                startForegroundService(serviceIntent);
+                startService(new Intent(this, AdbConfigService.class));
             } else {
                 stopService(new Intent(this, AdbConfigService.class));
             }
         });
 
         TextView instructionText = new TextView(this);
-        instructionText.setText("\nOpen this URL in your browser to configure pairing, target ports, and manage the app.\n\nYou can also toggle the web server directly from this screen if you want it disabled on future reboots.");
+        instructionText.setText("\nOpen this URL in your browser to configure pairing, target ports, and manage the app.\n\nThe web interface runs only while this app is open (and briefly after), so the app never stays active in the background. ADB is still configured automatically on every boot.");
 
         layout.addView(titleText);
         layout.addView(statusText);
