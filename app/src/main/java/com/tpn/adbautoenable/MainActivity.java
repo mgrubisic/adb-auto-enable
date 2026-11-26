@@ -1,6 +1,9 @@
 package com.tpn.adbautoenable;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.provider.Settings;
+import android.widget.Button;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.LinearLayout;
@@ -64,6 +67,22 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Button to open Accessibility settings, where the keep-alive service is enabled
+        Button accessibilityButton = new Button(this);
+        accessibilityButton.setText("Keep app alive (Accessibility)");
+        accessibilityButton.setPadding(0, 30, 0, 10);
+        accessibilityButton.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+            } catch (Exception e) {
+                startActivity(new Intent(Settings.ACTION_SETTINGS));
+            }
+        });
+
+        TextView accessibilityHint = new TextView(this);
+        accessibilityHint.setTextSize(13);
+        accessibilityHint.setText("Enable \"" + "ADB Auto-Enable" + "\" under Installed services to stop the system from killing the app. Optional.");
+
         TextView instructionText = new TextView(this);
         instructionText.setText("\nOpen this URL in your browser to configure pairing, target ports, and manage the app.\n\nThe web interface runs only while this app is open, so the app never stays active in the background. ADB is still configured automatically on every boot.");
 
@@ -71,6 +90,8 @@ public class MainActivity extends Activity {
         layout.addView(statusText);
         layout.addView(urlText);
         layout.addView(webServerSwitch);
+        layout.addView(accessibilityButton);
+        layout.addView(accessibilityHint);
         layout.addView(instructionText);
 
         setContentView(layout);
