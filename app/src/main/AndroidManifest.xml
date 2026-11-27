@@ -18,7 +18,8 @@
         android:directBootAware="true"
         android:allowBackup="false"
         android:label="${appLabel}"
-        android:icon="@android:drawable/ic_dialog_info"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         tools:ignore="DataExtractionRules">
 
