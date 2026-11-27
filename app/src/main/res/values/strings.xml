@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ADB Auto Enable</string>
+    <string name="accessibility_service_description">Keeps ADB Auto-Enable running so the system does not stop it. It reads nothing on your screen and performs no actions; it only prevents the app from being frozen or killed.</string>
+</resources>

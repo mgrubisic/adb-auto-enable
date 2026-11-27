@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.tpn.adbautoenable">
+
+    <!-- Required to receive boot events -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Required to enable wireless ADB (must be granted manually via 'adb shell pm grant') -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Required for embedded web server -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Required to check WiFi connection and get device IP -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Required for mDNS discovery -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <!-- Required to hold a WifiLock that keeps the network awake in standby -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:directBootAware="true"
+        android:allowBackup="false"
+        android:label="${appLabel}"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:supportsRtl="true"
+        tools:ignore="DataExtractionRules">
+
+
+        <!-- Boot-time ADB configuration runs as a job: no foreground service,
+             nothing under "Active in background", no notification -->
+        <service
+            android:name=".BootConfigJobService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Periodic, persisted keep-alive job. Like the boot job it is not a
+             foreground service: nothing under "Active in background", no
+             notification. Re-asserts ADB and the accessibility service so the
+             app recovers on its own if the system kills the process. -->
+        <service
+            android:name=".KeepAliveJobService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Accessibility service: keeps the app alive so the system never stops it.
+             Must be enabled once in Settings -> Accessibility. Handles no events. -->
+        <service
+            android:name=".KeepAliveAccessibilityService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>
