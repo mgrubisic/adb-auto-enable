@@ -163,6 +163,20 @@ public class WebServer extends NanoHTTPD {
                             }
                             Log.i(TAG, "TCL AUTO_START configured after pairing: " + autoStartAllowed);
                         }
+
+                        // Exempt the app from Doze / App Standby right after pairing,
+                        // while the discovered ADB port is live, so it can run
+                        // unattended without a foreground service.
+                        boolean exempt = false;
+                        for (String host : NetworkUtils.getAdbCandidateHosts(context, endpoint.host)) {
+                            exempt = adbHelper.ensurePersistenceExemptions(
+                                    host, endpoint.port, "com.tpn.adbautoenable");
+                            if (exempt) break;
+                        }
+                        Log.i(TAG, "Persistence exemptions configured after pairing: " + exempt);
+
+                        // Make sure the keep-alive accessibility service stays enabled.
+                        AppController.ensureAccessibilityServiceEnabled(context);
                     } catch (Exception e) {
                         Log.e(TAG, "Error during self-grant attempt", e);
                     }

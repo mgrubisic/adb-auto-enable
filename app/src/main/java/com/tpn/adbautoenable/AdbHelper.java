@@ -143,6 +143,45 @@ public class AdbHelper {
         }
     }
 
+    /**
+     * Keeps the app running unattended by exempting it from Doze / battery
+     * optimisation and pinning it to the "active" App Standby bucket, so the
+     * keep-alive process and periodic jobs are neither frozen nor deferred.
+     * Uses the same local ADB channel as the self-grant, so no foreground
+     * service or user interaction is required. Tries loopback first, then the
+     * active LAN host (Fixes the same loopback-only cases as self-grant).
+     */
+    public boolean ensurePersistenceExemptions(String host, int port, String packageName) {
+        if (executePersistenceExemptions("127.0.0.1", port, packageName)) {
+            return true;
+        }
+        if (!host.equals("127.0.0.1")) {
+            Log.i(TAG, "Persistence exemptions failed via loopback, retrying via " + host);
+            return executePersistenceExemptions(host, port, packageName);
+        }
+        return false;
+    }
+
+    private boolean executePersistenceExemptions(String host, int port, String packageName) {
+        try (SimpleAdbManager manager = new SimpleAdbManager(context)) {
+            manager.connect(host, port);
+
+            // Permanent Doze / battery-optimisation whitelist (survives reboot).
+            executeShell(manager, "dumpsys deviceidle whitelist +" + packageName);
+            // Keep the app in the "active" App Standby bucket so its jobs are not deferred.
+            executeShell(manager, "am set-standby-bucket " + packageName + " active");
+
+            // Verify the Doze whitelist entry actually took.
+            String whitelist = executeShell(manager, "dumpsys deviceidle whitelist");
+            boolean exempt = whitelist.contains(packageName);
+            Log.i(TAG, "Doze whitelist contains " + packageName + ": " + exempt);
+            return exempt;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to apply persistence exemptions on " + host + ":" + port, e);
+            return false;
+        }
+    }
+
     private String executeShell(SimpleAdbManager manager, String command) throws Exception {
         StringBuilder output = new StringBuilder();
         try (AdbStream stream = manager.openStream("shell:" + command);

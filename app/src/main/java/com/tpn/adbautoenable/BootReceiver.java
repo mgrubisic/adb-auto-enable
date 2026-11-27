@@ -20,6 +20,9 @@ public class BootReceiver extends BroadcastReceiver {
             // A job instead of a foreground service: nothing appears under
             // "Active in background" and no notification is shown.
             BootConfigJobService.schedule(context);
+            // Also (re)schedule the periodic keep-alive job so the app recovers
+            // on its own after boot without any foreground service.
+            KeepAliveJobService.schedule(context);
         } else {
             Log.i(TAG, "Ignoring broadcast: " + action);
         }

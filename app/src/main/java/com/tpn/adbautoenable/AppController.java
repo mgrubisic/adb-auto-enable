@@ -1,9 +1,12 @@
 package com.tpn.adbautoenable;
 
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.io.IOException;
@@ -49,9 +52,61 @@ final class AppController {
     /** Quick, non-blocking upkeep that used to run on every service start. */
     static void runStartupChecks(Context context) {
         ensureBootReceiverEnabled(context);
+        ensureAccessibilityServiceEnabled(context);
+        KeepAliveJobService.schedule(context);
         ensureTclAutostartProtectionAsync(context);
         new Thread(() -> new BootConfigurator(context.getApplicationContext())
                 .enableWirelessDebuggingImmediately(), "enable-wifi-adb").start();
+    }
+
+    /**
+     * Keeps the KeepAlive accessibility service enabled without the user having
+     * to re-toggle it in Settings. The accessibility binding is the strongest
+     * keep-alive signal (high process priority, Doze/App-Standby exemption,
+     * automatic restart), so if some OEM build or an app update drops it, this
+     * re-adds it. Requires WRITE_SECURE_SETTINGS, which the app self-grants via
+     * ADB after pairing; before that this is a harmless no-op. Existing enabled
+     * services are preserved, never overwritten.
+     */
+    static void ensureAccessibilityServiceEnabled(Context context) {
+        try {
+            ContentResolver cr = context.getContentResolver();
+            ComponentName service = new ComponentName(context, KeepAliveAccessibilityService.class);
+
+            String enabled = Settings.Secure.getString(
+                    cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (enabled == null) {
+                enabled = "";
+            }
+
+            boolean present = false;
+            for (String part : enabled.split(":")) {
+                if (part.isEmpty()) {
+                    continue;
+                }
+                ComponentName existing = ComponentName.unflattenFromString(part);
+                if (service.equals(existing) || service.flattenToString().equals(part)) {
+                    present = true;
+                    break;
+                }
+            }
+
+            if (!present) {
+                String updated = TextUtils.isEmpty(enabled)
+                        ? service.flattenToString()
+                        : enabled + ":" + service.flattenToString();
+                Settings.Secure.putString(
+                        cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, updated);
+                Log.i(TAG, "Re-added KeepAlive accessibility service to the enabled list");
+            }
+
+            // Master accessibility switch must be on for enabled services to bind.
+            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1);
+        } catch (SecurityException e) {
+            Log.i(TAG, "WRITE_SECURE_SETTINGS not granted yet; skipping accessibility self-enable");
+        } catch (Exception e) {
+            Log.e(TAG, "Could not ensure accessibility service enabled", e);
+        }
     }
 
     static void ensureBootReceiverEnabled(Context context) {

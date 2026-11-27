@@ -36,6 +36,16 @@
             android:directBootAware="true"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
+        <!-- Periodic, persisted keep-alive job. Like the boot job it is not a
+             foreground service: nothing under "Active in background", no
+             notification. Re-asserts ADB and the accessibility service so the
+             app recovers on its own if the system kills the process. -->
+        <service
+            android:name=".KeepAliveJobService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
