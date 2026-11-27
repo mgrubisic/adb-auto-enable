@@ -213,17 +213,6 @@ class BootConfigurator {
             Log.i(TAG, "Found ADB at " + endpoint);
             saveLastPort(endpoint.port);
 
-            // While we still hold the discovered ADB port, make the app survive
-            // Doze / App Standby so the keep-alive job and accessibility binding
-            // keep working unattended. Persists across reboots; re-applied here
-            // on every boot as a safety net.
-            boolean exempt = false;
-            for (String host : NetworkUtils.getAdbCandidateHosts(context, endpoint.host)) {
-                exempt = adbHelper.ensurePersistenceExemptions(host, endpoint.port, context.getPackageName());
-                if (exempt) break;
-            }
-            Log.i(TAG, "Persistence exemptions applied: " + exempt);
-
             int targetPort = getTargetPort();
             Log.i(TAG, "Step 4: Switching to port " + targetPort + "...");
             updateNotification("Switching to port " + targetPort + "...");

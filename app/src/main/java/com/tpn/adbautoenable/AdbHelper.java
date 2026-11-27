@@ -27,7 +27,6 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
@@ -122,7 +121,7 @@ public class AdbHelper {
         if (executeTclAutoStart("127.0.0.1", port, packageName)) {
             return true;
         }
-        if (!host.equals("127.0.0.1")) {
+        if (isValidFallbackHost(host)) {
             Log.i(TAG, "TCL auto-start setup failed via loopback, retrying via " + host);
             return executeTclAutoStart(host, port, packageName);
         }
@@ -131,6 +130,7 @@ public class AdbHelper {
 
     private boolean executeTclAutoStart(String host, int port, String packageName) {
         try (SimpleAdbManager manager = new SimpleAdbManager(context)) {
+            manager.setTimeout(5, TimeUnit.SECONDS);
             manager.connect(host, port);
             executeShell(manager, "appops set " + packageName + " AUTO_START allow");
             String state = executeShell(manager, "appops get " + packageName + " AUTO_START");
@@ -144,42 +144,79 @@ public class AdbHelper {
     }
 
     /**
-     * Keeps the app running unattended by exempting it from Doze / battery
-     * optimisation and pinning it to the "active" App Standby bucket, so the
-     * keep-alive process and periodic jobs are neither frozen nor deferred.
-     * Uses the same local ADB channel as the self-grant, so no foreground
-     * service or user interaction is required. Tries loopback first, then the
-     * active LAN host (Fixes the same loopback-only cases as self-grant).
+     * Primjenjuje sistemske iznimke za neprekidni rad u pozadini bez Foreground servisa:
+     * Doze whitelist, RUN_IN_BACKGROUND, RUN_ANY_IN_BACKGROUND, App Standby Bucket (active),
+     * isključenje automatske hibernacije/oduzimanja dozvola i dopuštenje restricted settings.
      */
-    public boolean ensurePersistenceExemptions(String host, int port, String packageName) {
-        if (executePersistenceExemptions("127.0.0.1", port, packageName)) {
+    public boolean ensureBackgroundExemptions(String host, int port, String packageName) {
+        if (executeBackgroundExemptions("127.0.0.1", port, packageName)) {
             return true;
         }
-        if (!host.equals("127.0.0.1")) {
-            Log.i(TAG, "Persistence exemptions failed via loopback, retrying via " + host);
-            return executePersistenceExemptions(host, port, packageName);
+        if (isValidFallbackHost(host)) {
+            Log.i(TAG, "Background exemptions setup failed via loopback, retrying via " + host);
+            return executeBackgroundExemptions(host, port, packageName);
         }
         return false;
     }
 
-    private boolean executePersistenceExemptions(String host, int port, String packageName) {
+    private boolean executeBackgroundExemptions(String host, int port, String packageName) {
         try (SimpleAdbManager manager = new SimpleAdbManager(context)) {
+            manager.setTimeout(5, TimeUnit.SECONDS);
             manager.connect(host, port);
 
-            // Permanent Doze / battery-optimisation whitelist (survives reboot).
-            executeShell(manager, "dumpsys deviceidle whitelist +" + packageName);
-            // Keep the app in the "active" App Standby bucket so its jobs are not deferred.
-            executeShell(manager, "am set-standby-bucket " + packageName + " active");
+            // 1. Izuzeće iz Doze moda / optimizacije baterije
+            runShellSafe(manager, "dumpsys deviceidle whitelist +" + packageName);
 
-            // Verify the Doze whitelist entry actually took.
-            String whitelist = executeShell(manager, "dumpsys deviceidle whitelist");
-            boolean exempt = whitelist.contains(packageName);
-            Log.i(TAG, "Doze whitelist contains " + packageName + ": " + exempt);
-            return exempt;
+            // 2. Dopuštenje neograničenog pozadinskog rada
+            runShellSafe(manager, "cmd appops set " + packageName + " RUN_IN_BACKGROUND allow");
+            runShellSafe(manager, "cmd appops set " + packageName + " RUN_ANY_IN_BACKGROUND allow");
+
+            // 3. Postavljanje u najaktivniji App Standby bucket
+            runShellSafe(manager, "am set-standby-bucket " + packageName + " active");
+
+            // 4. Sprječavanje automatskog oduzimanja dozvola i hibernacije (Android 11+/12+)
+            runShellSafe(manager, "cmd appops set " + packageName + " AUTO_REVOKE_PERMISSIONS_IF_UNUSED ignore");
+            runShellSafe(manager, "cmd app_hibernation set-state " + packageName + " false");
+
+            // 5. Dopuštenje restricted settings (Accessibility) za sideloadane aplikacije (Android 13+)
+            runShellSafe(manager, "cmd appops set " + packageName + " ACCESS_RESTRICTED_SETTINGS allow");
+
+            // Verifikacija ključnih postavki
+            String whitelistOut = runShellSafe(manager, "dumpsys deviceidle whitelist");
+            boolean whitelisted = whitelistOut.contains(packageName);
+
+            String runAnyOut = runShellSafe(manager, "cmd appops get " + packageName + " RUN_ANY_IN_BACKGROUND");
+            boolean runAnyAllowed = runAnyOut.toLowerCase(Locale.ROOT).contains("allow");
+
+            String bucketOut = runShellSafe(manager, "am get-standby-bucket " + packageName).trim();
+
+            Log.i(TAG, "Background exemptions verified on " + host + ":" + port
+                    + " -> dozeWhitelist=" + whitelisted
+                    + ", runAnyInBackground=" + runAnyAllowed
+                    + ", standbyBucket=" + bucketOut);
+
+            return whitelisted && runAnyAllowed;
         } catch (Exception e) {
-            Log.e(TAG, "Failed to apply persistence exemptions on " + host + ":" + port, e);
+            Log.e(TAG, "Failed to apply background exemptions on " + host + ":" + port, e);
             return false;
         }
+    }
+
+    private String runShellSafe(SimpleAdbManager manager, String command) {
+        try {
+            String out = executeShell(manager, command);
+            if (!out.trim().isEmpty()) {
+                Log.d(TAG, "Shell [" + command + "] -> " + out.trim());
+            }
+            return out;
+        } catch (Exception e) {
+            Log.w(TAG, "Shell command failed [" + command + "]: " + e.getMessage());
+            return "";
+        }
+    }
+
+    private boolean isValidFallbackHost(String host) {
+        return host != null && !host.trim().isEmpty() && !"127.0.0.1".equals(host.trim());
     }
 
     private String executeShell(SimpleAdbManager manager, String command) throws Exception {
@@ -208,7 +245,7 @@ public class AdbHelper {
             return true;
         }
         // Fall back to active host/IP if different (Fixes #8)
-        if (!host.equals("127.0.0.1")) {
+        if (isValidFallbackHost(host)) {
             Log.i(TAG, "Self-grant failed via loopback, retrying via " + host + "...");
             return executeSelfGrant(host, port, packageName, permission);
         }
