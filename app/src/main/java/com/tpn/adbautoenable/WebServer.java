@@ -137,7 +137,7 @@ public class WebServer extends NanoHTTPD {
                         for (String host : NetworkUtils.getAdbCandidateHosts(context, endpoint.host)) {
                             Log.i(TAG, "Attempting self-grant via " + host + " on " + endpoint);
                             granted = adbHelper.selfGrantPermission(host, endpoint.port,
-                                    "com.tpn.adbautoenable", "android.permission.WRITE_SECURE_SETTINGS");
+                                    context.getPackageName(), "android.permission.WRITE_SECURE_SETTINGS");
                             if (granted) break;
                         }
 
@@ -170,7 +170,7 @@ public class WebServer extends NanoHTTPD {
                         boolean exempt = false;
                         for (String host : NetworkUtils.getAdbCandidateHosts(context, endpoint.host)) {
                             exempt = adbHelper.ensurePersistenceExemptions(
-                                    host, endpoint.port, "com.tpn.adbautoenable");
+                                    host, endpoint.port, context.getPackageName());
                             if (exempt) break;
                         }
                         Log.i(TAG, "Persistence exemptions configured after pairing: " + exempt);
