@@ -137,7 +137,7 @@ public class WebServer extends NanoHTTPD {
                         for (String host : NetworkUtils.getAdbCandidateHosts(context, endpoint.host)) {
                             Log.i(TAG, "Attempting self-grant via " + host + " on " + endpoint);
                             granted = adbHelper.selfGrantPermission(host, endpoint.port,
-                                    "com.tpn.adbautoenable", "android.permission.WRITE_SECURE_SETTINGS");
+                                    context.getPackageName(), "android.permission.WRITE_SECURE_SETTINGS");
                             if (granted) break;
                         }
 
